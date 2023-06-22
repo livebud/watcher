@@ -1,5 +1,7 @@
 # Watcher
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/livebud/watcher.svg)](https://pkg.go.dev/github.com/livebud/watcher)
+
 Resilient file watcher. Used in [Bud](https://github.com/livebud/bud).
 
 ## Features
