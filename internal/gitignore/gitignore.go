@@ -13,14 +13,9 @@ var alwaysIgnore = []string{
 	"node_modules",
 	".git",
 	".DS_Store",
-	// Regardless of if this directory is committed or not, it should be ignored
-	// because this will trigger unnecessary rebuilds during development.
-	"bud",
 }
 
-var defaultIgnores = append([]string{"/bud"}, alwaysIgnore...)
-
-var defaultIgnore = gitignore.CompileIgnoreLines(defaultIgnores...).MatchesPath
+var defaultIgnore = gitignore.CompileIgnoreLines(alwaysIgnore...).MatchesPath
 
 func FromFS(fsys fs.FS) (ignore func(path string) bool) {
 	code, err := fs.ReadFile(fsys, ".gitignore")
