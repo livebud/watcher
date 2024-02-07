@@ -49,7 +49,8 @@ func (e Event) String() string {
 
 func newEventSet() *eventSet {
 	return &eventSet{
-		events: map[string]Event{},
+		has:    map[string]bool{},
+		events: []Event{},
 	}
 }
 
@@ -57,27 +58,46 @@ func newEventSet() *eventSet {
 // when the watch function is triggered.
 type eventSet struct {
 	mu     sync.RWMutex
-	events map[string]Event
+	has    map[string]bool
+	events []Event
 }
 
 // Add a event to the set
 func (p *eventSet) Add(event Event) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.events[event.String()] = event
+	if p.has[event.String()] {
+		return
+	}
+	p.has[event.String()] = true
+	p.events = append(p.events, event)
 }
 
 // Flush the stored events and clear the event set.
 func (p *eventSet) Flush() (events []Event) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	events = make([]Event, 0, len(p.events))
+	// Sometimes you can end up with two events for the same file like create and
+	// update on Mac. Remove any updates, when we have a create or delete event.
+	seen := map[string]bool{}
 	for _, event := range p.events {
+		if seen[event.Path] {
+			continue
+		}
+		seen[event.Path] = true
 		events = append(events, event)
 	}
+	// Sort amongst the same operation to make the tests deterministic.
 	sort.Slice(events, func(i, j int) bool {
-		return events[i].String() < events[j].String()
+		if events[i].Op == events[j].Op {
+			return events[i].Path < events[j].Path
+		}
+		return false
 	})
-	p.events = map[string]Event{}
+	// Clear the set
+	p.has = map[string]bool{}
+	p.events = []Event{}
 	return events
 }
 
@@ -305,7 +325,7 @@ func Watch(ctx context.Context, dir string, fn func(events []Event) error) error
 // computeStamp uses path, size, mode and modtime to try and ensure this is a
 // unique event.
 func computeStamp(path string, stat fs.FileInfo) (stamp string, err error) {
-	mtime := stat.ModTime().UnixNano()
+	mtime := stat.ModTime().Unix()
 	mode := stat.Mode()
 	size := stat.Size()
 	stamp = path + ":" + strconv.Itoa(int(size)) + ":" + mode.String() + ":" + strconv.Itoa(int(mtime))
